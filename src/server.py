@@ -28,7 +28,11 @@ def main():
         name="CFBench Evaluation",
         description="Evaluates agents on CFBench tasks.",
         tags=["benchmark", "evaluation", "CFBench"],
-        examples=[]
+        examples=[
+            '{"participants": {"agent": "http://localhost:9019"}, "config": {"num_tasks": 10, "debug": false}}',
+            '{"participants": {"agent": "http://localhost:9019"}, "config": {"debug": true, "enable_response_eval": true}}',
+            '{"participants": {"agent": "http://localhost:9019"}, "config": {"sample_ids": ["Car-Rental-0", "Hotel-0"]}}'
+        ]
     )
 
     agent_card = AgentCard(
