@@ -81,11 +81,8 @@ You can call multiple tools at once by including multiple objects in the tool_ca
 When you're ready to provide a final answer, respond with plain text (not JSON).
 
 User query: {user_query}"""
-
-            self._is_first_call = False
         else:
-            # Subsequent calls: send conversation history
-            formatted_message = self._format_history(messages, tools)
+            formatted_message = self._format_observations(messages)
 
         try:
             loop = asyncio.get_event_loop()
@@ -104,19 +101,20 @@ User query: {user_query}"""
         # Parse response
         return self._parse_response(response_text)
 
-    def _format_history(self, messages: list, tools: list) -> str:
-        """Format conversation history for agent."""
-        history_str = json.dumps(messages, ensure_ascii=False, indent=2)
-        tools_str = json.dumps(tools, ensure_ascii=False, indent=2)
+    def _format_observations(self, messages: list) -> str:
+        """Format tool observations (results) as simple text, following tau2 pattern."""
+        for msg in reversed(messages):
+            if msg.get('role') == 'observation':
+                observations = msg.get('content', [])
+                if not observations:
+                    return "No tool results available."
 
-        return f"""Continue the conversation. Available tools:
+                result_lines = []
+                for obs in observations:
+                    result_lines.append(f"Tool result: {json.dumps(obs, ensure_ascii=False)}")
+                return "\n".join(result_lines)
 
-{tools_str}
-
-Conversation history:
-{history_str}
-
-Provide your next action (tool calls or final response)."""
+        return "Continue with your next action."
 
     async def _call_agent_with_retry(self, message: str, max_retries: int = 3) -> str:
         """Call A2A agent with retry logic."""
@@ -129,6 +127,10 @@ Provide your next action (tool calls or final response)."""
                     url=self.agent_url,
                     new_conversation=(attempt == 0 and self._is_first_call)
                 )
+
+                if self._is_first_call:
+                    self._is_first_call = False
+
                 return response
 
             except Exception as e:
