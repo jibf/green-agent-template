@@ -3,6 +3,7 @@ import copy
 import gc
 import random
 import torch
+import os
 import numpy as np
 import warnings
 from FlagEmbedding import FlagModel
@@ -19,7 +20,7 @@ from utils.logger import Logger
 
 class CompareFCBase:
     def __init__(self, args, logger) -> None:
-        self.embedding = FlagModel('BAAI/bge-large-en-v1.5', 
+        self.embedding = FlagModel('BAAI/bge-large-en-v1.5',
                         query_instruction_for_retrieval="Represent this sentence for searching relevant passages:",
                         use_fp16=True, devices='cpu')
 
@@ -27,7 +28,8 @@ class CompareFCBase:
             tool_info = json.load(f)
         tool_info = tool_info['booking-com15']
         self.api_call = RapidAPICall(tool="booking-com15", tool_info=tool_info)
-        self.model = GPTModel("openai/gpt-4o-20240806")
+        model_name = os.getenv("EVAL_MODEL", "gpt-4o-2024-08-06")
+        self.model = GPTModel(model_name=model_name)
         self.logger = logger
         self.error_message = []
         self.exact_match_dict = load_json("utils/exact_match_values.json")
@@ -43,15 +45,13 @@ class CompareFCBase:
         used_func = name_to_func[func_call['name']]
         required_params = used_func['parameters']['required']
         if not set(required_params).issubset(set(func_call['arguments'].keys())):
-            # 找到在required_params中，但不在func_call['arguments'].keys()中的参数
             missing_param = set(required_params) - set(func_call['arguments'].keys())
             return {"error": f"Function {used_func['name']} requires parameters {required_params}, but {list(func_call['arguments'].keys())} do not provide {missing_param}"}
         
         if not set(func_call['arguments'].keys()).issubset(set(used_func['parameters']['properties'].keys())):
             missing_param = set(func_call['arguments'].keys()) - set(used_func['parameters']['properties'].keys())
             return {"error":f"Function {used_func['name']} does not have parameters {missing_param}" }
-        
-        # 参数类型验证
+
         for param_name, param_value in func_call['arguments'].items():
             if used_func['parameters']['properties'][param_name]['type'] == "string":
                 if not isinstance(param_value, str):

@@ -6,17 +6,22 @@ while delegating to A2A agents. This allows us to reuse ComplexFuncBench's
 original evaluation logic completely.
 """
 import sys
+import re
 import os
 import json
 import copy
 import asyncio
-from typing import Any, Optional
 import nest_asyncio
 
 nest_asyncio.apply()
 
 cfbench_path = os.path.join(os.path.dirname(__file__), '..', 'ComplexFuncBench')
 sys.path.insert(0, cfbench_path)
+
+# Change working directory to ComplexFuncBench
+# This is required because ComplexFuncBench uses relative paths like "utils/tool_info.json"
+_original_cwd = os.getcwd()
+os.chdir(cfbench_path)
 
 from runner.base_runner import ModelRunner
 
@@ -36,7 +41,7 @@ class RemoteA2AModel:
         self.messages = []  # Track conversation history
         self._is_first_call = True
 
-    def __call__(self, messages, tools=None, **kwargs):
+    def __call__(self, messages, tools=None):
         """
         Model call interface expected by ComplexFuncBench.
 
@@ -49,7 +54,6 @@ class RemoteA2AModel:
         """
         self.messages = copy.deepcopy(messages)
 
-        # Format message for A2A agent
         if self._is_first_call:
             tools_desc = json.dumps(tools, ensure_ascii=False, indent=2)
             user_query = messages[0]['content'] if messages else ""
@@ -95,7 +99,6 @@ User query: {user_query}"""
             )
         except Exception as e:
             self.logger.error(f"Agent call failed: {e}")
-            # Return error response
             return self._create_error_response(str(e))
 
         # Parse response
@@ -147,16 +150,83 @@ Provide your next action (tool calls or final response)."""
         try:
             data = json.loads(response_text)
 
-            # Check if it's tool calls
             if 'tool_calls' in data:
                 return MockToolCallResponse(data['tool_calls'])
 
-            # Otherwise treat as content
+            if 'response' in data and isinstance(data['response'], str):
+                tool_calls = self._extract_tool_calls_from_text(data['response'])
+                if tool_calls:
+                    return MockToolCallResponse(tool_calls)
+            else:
+                tool_calls = self._extract_tool_calls_from_text(response_text)
+                if tool_calls:
+                    return MockToolCallResponse(tool_calls)
+
             return MockContentResponse(response_text)
 
         except json.JSONDecodeError:
-            # Plain text response
+            tool_calls = self._extract_tool_calls_from_text(response_text)
+            if tool_calls:
+                return MockToolCallResponse(tool_calls)
             return MockContentResponse(response_text)
+
+    def _extract_tool_calls_from_text(self, text: str) -> list | None:
+        """Extract tool calls from text containing ```json code blocks."""
+        tool_calls = []
+
+        json_blocks = re.findall(r'```json\s*\n(.*?)\n```', text, re.DOTALL)
+
+        for block in json_blocks:
+            try:
+                data = json.loads(block)
+
+                if isinstance(data, list):
+                    for item in data:
+                        if isinstance(item, dict):
+                            if item.get('type') == 'function' and 'function' in item:
+                                tool_calls.append(item)
+                            elif 'name' in item and 'arguments' in item:
+                                tool_calls.append({
+                                    "type": "function",
+                                    "function": {
+                                        "name": item['name'],
+                                        "arguments": item['arguments']
+                                    }
+                                })
+
+                elif isinstance(data, dict):
+                    if data.get('type') == 'function' and 'function' in data:
+                        tool_calls.append(data)
+                    elif 'name' in data and 'arguments' in data:
+                        tool_calls.append({
+                            "type": "function",
+                            "function": {
+                                "name": data['name'],
+                                "arguments": data['arguments']
+                            }
+                        })
+            except json.JSONDecodeError:
+                continue
+
+        if not tool_calls:
+            potential_jsons = re.findall(r'\{[^{}]*"name"[^{}]*"arguments"[^{}]*\}', text, re.DOTALL)
+            for json_str in potential_jsons:
+                try:
+                    data = json.loads(json_str)
+                    if data.get('type') == 'function' and 'function' in data:
+                        tool_calls.append(data)
+                    elif 'name' in data and 'arguments' in data:
+                        tool_calls.append({
+                            "type": "function",
+                            "function": {
+                                "name": data['name'],
+                                "arguments": data['arguments']
+                            }
+                        })
+                except json.JSONDecodeError:
+                    continue
+
+        return tool_calls if tool_calls else None
 
     def _create_error_response(self, error_msg: str):
         """Create error response."""
@@ -169,16 +239,10 @@ Provide your next action (tool calls or final response)."""
 
 
 class MockToolCallResponse:
-    """
-    Mock response object for tool calls.
-
-    Mimics OpenAI's ChatCompletionMessage structure.
-    """
+    """Mock response object for tool calls."""
 
     def __init__(self, tool_calls_data: list):
-        self.tool_calls = [
-            MockToolCall(tc) for tc in tool_calls_data
-        ]
+        self.tool_calls = [MockToolCall(tc) for tc in tool_calls_data]
         self.content = None
 
 
@@ -208,11 +272,7 @@ class MockContentResponse:
 
 
 class ComplexFuncBenchRunner(ModelRunner):
-    """
-    Wrapper for ComplexFuncBench's base runner that uses A2A agent.
-
-    This class extends ModelRunner and overrides the model to use RemoteA2AModel.
-    """
+    """Wrapper for ComplexFuncBench's base runner that uses A2A agent."""
 
     def __init__(self, args, logger, messenger, agent_url: str):
         super().__init__(args, logger)
@@ -220,11 +280,7 @@ class ComplexFuncBenchRunner(ModelRunner):
         self.model_name = "remote_a2a_agent"
 
     def run(self, data):
-        """
-        Run evaluation using ComplexFuncBench's original logic.
-
-        This method is adapted from GPTRunner.run() but uses RemoteA2AModel.
-        """
+        """Run evaluation using ComplexFuncBench's original logic."""
         convs, functions = data['conversations'], data['functions']
         self.CompareClass.add_free_function(convs)
 
@@ -248,10 +304,8 @@ class ComplexFuncBenchRunner(ModelRunner):
 
             if llm_response.tool_calls:
                 if self.golden_fcs == []:
-                    self.logger.error(f"Output FC:\n{llm_response.tool_calls}")
-                    return self.return_result(messages, {"error_type": "func_hallucination", "content": "`self.golden_fcs == []`. Expected to stop. But Model continue to output function call."})
+                    return self.return_result(messages, {"error_type": "func_hallucination", "content": "Expected to stop but model continued outputting function calls."})
 
-                # Add to messages
                 if llm_response.content is not None:
                     self.model.messages.append({"role": "assistant", "content": llm_response.content, "tool_calls": llm_response.tool_calls})
                 else:
@@ -259,16 +313,12 @@ class ComplexFuncBenchRunner(ModelRunner):
 
                 tool_calls = llm_response.tool_calls
 
-                # Parse function calls
                 function_calls = []
                 for tool_call in tool_calls:
                     function_call = self._parse_tool_call(tool_call)
                     if function_call is None:
-                        return self.return_result(messages, {"error_type": "decode_error", "content": f"{tool_call.function} is not Valid."})
+                        return self.return_result(messages, {"error_type": "decode_error", "content": f"{tool_call.function} is not valid."})
                     function_calls.append(function_call)
-
-                self.logger.info(f"Function Calls: \n{json.dumps(function_calls, ensure_ascii=False, indent=4)}\n")
-                self.logger.info(f"Golden Function Call: \n{json.dumps(self.golden_fcs, ensure_ascii=False, indent=4)}\n")
 
                 messages.append({"role": "assistant", "function_call": function_calls})
 
@@ -283,24 +333,21 @@ class ComplexFuncBenchRunner(ModelRunner):
 
                 self.correct_count += len(success_map)
 
-                # Build observations
                 real_time_obs = []
                 for t, function_call in enumerate(function_calls):
                     if t in success_map:
-                        gold_idx = success_map[t]
-                        real_time_obs.append(self.golden_obs[gold_idx])
+                        real_time_obs.append(success_map[t])
+                    elif t in format_error:
+                        real_time_obs.append(format_error[t])
                     else:
                         real_time_obs.append(self.unexpect_call_resp)
 
                 messages.append({"role": "observation", "content": real_time_obs})
-
                 self.process_matches(success_matched)
 
             else:
-                # Final response
                 if llm_response.content:
                     messages.append({"role": "assistant", "content": llm_response.content})
-
                 return self.return_result(messages)
 
     def _parse_tool_call(self, tool_call):
@@ -313,7 +360,7 @@ class ComplexFuncBenchRunner(ModelRunner):
 
         try:
             function_call['arguments'] = json.loads(tool_call.function.arguments)
-        except:
+        except json.JSONDecodeError:
             return None
 
         if function_call['arguments'] is None:

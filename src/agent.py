@@ -46,8 +46,6 @@ class Agent:
         if missing_config_keys:
             return False, f"Missing config keys: {missing_config_keys}"
 
-        # Add additional request validation here
-
         return True, "ok"
 
     async def run(self, message: Message, updater: TaskUpdater) -> None:
@@ -60,7 +58,6 @@ class Agent:
         """
         input_text = get_message_text(message)
 
-        # Parse and validate request
         try:
             request: EvalRequest = EvalRequest.model_validate_json(input_text)
             ok, msg = self.validate_request(request)
@@ -75,8 +72,8 @@ class Agent:
         num_tasks = request.config.get("num_tasks", None)
         debug = request.config.get("debug", False)
         sample_ids = request.config.get("sample_ids", None)
-        data_file = request.config.get("data_file", "ComplexFuncBench/data/ComplexFuncBench.jsonl")
-        enable_response_eval = request.config.get("enable_response_eval", False)
+        data_file = request.config.get("data_file", "data/ComplexFuncBench.jsonl")
+        enable_response_eval = request.config.get("enable_response_eval", True)
 
         self.logger = logging.getLogger(f"cfbench_evaluator")
         self.logger.setLevel(logging.INFO)
@@ -116,16 +113,16 @@ class Agent:
         results = []
 
         args = MockArgs()
-        runner = ComplexFuncBenchRunner(args, self.logger, self.messenger, agent_url)
 
         # Initialize response evaluator if enabled
         response_evaluator = None
         if enable_response_eval:
             try:
                 response_evaluator = ResponseEvaluator(logger=self.logger)
+                eval_model = os.getenv("EVAL_MODEL", "gpt-4o-2024-08-06")
                 await updater.update_status(
                     TaskState.working,
-                    new_agent_text_message("Response evaluation enabled (using GPT-4o)")
+                    new_agent_text_message(f"Response evaluation enabled (using {eval_model})")
                 )
             except ValueError as e:
                 await updater.update_status(
@@ -143,6 +140,9 @@ class Agent:
             )
 
             try:
+                # Create a new runner for each task to ensure clean state
+                runner = ComplexFuncBenchRunner(args, self.logger, self.messenger, agent_url)
+
                 # Run single task with ComplexFuncBench runner
                 # ComplexFuncBench's run() returns: (messages, result_message, success_turn, correct_count)
                 messages, result_message, success_turn, correct_count = runner.run(task)

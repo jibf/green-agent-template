@@ -15,20 +15,25 @@ from collections import defaultdict
 
 
 class GPTModel:
-    def __init__(self, model_name, is_user=False):
+    def __init__(self, model_name=None, is_user=False):
         super().__init__()
+
+        # Get configuration from environment
+        api_key = os.getenv("OPENAI_API_KEY")
+        base_url = os.getenv("OPENAI_BASE_URL")
+
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY environment variable not set")
+
+        # Use env variable for model name if not provided
+        if model_name is None:
+            model_name = os.getenv("EVAL_MODEL", "gpt-4o-2024-08-06")
+
         self.model_name = model_name
-        if is_user:
-            self.client = OpenAI(
-                api_key=os.getenv("API_KEY"),
-                base_url=os.getenv("BASE_URL")
-            )
-        else:
-            self.client = OpenAI(
-                api_key=os.getenv("API_KEY"),
-                base_url=os.getenv("BASE_URL")
-            )
-        
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url=base_url
+        )
 
     def __call__(self, prefix, prompt: SimpleTemplatePrompt, **kwargs: Any):
         filled_prompt = prompt(**kwargs)

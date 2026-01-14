@@ -6,6 +6,8 @@ using GPT-4o as the judge model.
 """
 import json
 import os
+import asyncio
+import time
 from typing import Optional
 from openai import OpenAI
 
@@ -13,22 +15,32 @@ from openai import OpenAI
 def retry(max_attempts=10, delay=1):
     """Retry decorator for API calls."""
     def decorator(func):
-        async def wrapper(*args, **kwargs):
-            import asyncio
-            last_error = None
-            for attempt in range(max_attempts):
-                try:
-                    return await func(*args, **kwargs) if asyncio.iscoroutinefunction(func) else func(*args, **kwargs)
-                except Exception as e:
-                    last_error = e
-                    if attempt < max_attempts - 1:
-                        if asyncio.iscoroutinefunction(func):
+        if asyncio.iscoroutinefunction(func):
+            # Async wrapper for async functions
+            async def async_wrapper(*args, **kwargs):
+                last_error = None
+                for attempt in range(max_attempts):
+                    try:
+                        return await func(*args, **kwargs)
+                    except Exception as e:
+                        last_error = e
+                        if attempt < max_attempts - 1:
                             await asyncio.sleep(delay)
-                        else:
-                            import time
+                raise last_error
+            return async_wrapper
+        else:
+            # Sync wrapper for sync functions
+            def sync_wrapper(*args, **kwargs):
+                last_error = None
+                for attempt in range(max_attempts):
+                    try:
+                        return func(*args, **kwargs)
+                    except Exception as e:
+                        last_error = e
+                        if attempt < max_attempts - 1:
                             time.sleep(delay)
-            raise last_error
-        return wrapper
+                raise last_error
+            return sync_wrapper
     return decorator
 
 
@@ -128,22 +140,32 @@ You should output the score for each dialogue history and corresponding response
 ```
 """
 
-    def __init__(self, eval_model: str = "gpt-4o-2024-08-06", logger=None):
+    def __init__(self, eval_model: str = None, logger=None):
         """
         Initialize evaluator.
 
         Args:
-            eval_model: Model to use for evaluation (default: gpt-4o-2024-08-06)
+            eval_model: Model to use for evaluation (defaults to EVAL_MODEL env var)
             logger: Optional logger instance
         """
-        self.eval_model = eval_model
-        self.logger = logger
-
+        # Get configuration from environment
         api_key = os.getenv("OPENAI_API_KEY")
+        base_url = os.getenv("OPENAI_BASE_URL")
+
         if not api_key:
             raise ValueError("OPENAI_API_KEY environment variable not set")
 
-        self.client = OpenAI(api_key=api_key)
+        # Use env variable for model name if not provided
+        if eval_model is None:
+            eval_model = os.getenv("EVAL_MODEL", "gpt-4o-2024-08-06")
+
+        self.eval_model = eval_model
+        self.logger = logger
+
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url=base_url
+        )
 
     @retry(max_attempts=10)
     def _call_judge(self, system_prompt: str, user_prompt: str) -> Optional[dict]:
@@ -172,6 +194,32 @@ You should output the score for each dialogue history and corresponding response
                 self.logger.error(f"Judge call failed: {e}")
             return None
 
+    def _evaluate(self, system_prompt: str, user_prompt: str, eval_type: str) -> dict:
+        """
+        Common evaluation logic for both completeness and correctness.
+
+        Args:
+            system_prompt: System prompt for the judge
+            user_prompt: User prompt with the evaluation data
+            eval_type: Type of evaluation ("Completeness" or "Correctness")
+
+        Returns:
+            dict with score and reason
+        """
+        result = self._call_judge(system_prompt, user_prompt)
+
+        if result and isinstance(result, dict) and "score" in result:
+            if result['score'] in [0, 1, 2]:
+                return {
+                    "score": result['score'],
+                    "reason": result.get("reason", "")
+                }
+
+        return {
+            "score": -1,
+            "reason": f"{eval_type} evaluation failed"
+        }
+
     async def evaluate_completeness(self, query: str, response: str) -> dict:
         """
         Evaluate response completeness.
@@ -181,9 +229,7 @@ You should output the score for each dialogue history and corresponding response
             response: Agent response
 
         Returns:
-            dict with:
-                - score: 0/1/2
-                - reason: explanation
+            dict with score (0/1/2) and reason
         """
         if not response or response == "":
             return {
@@ -198,19 +244,7 @@ response: {response}
 output:
 """
 
-        result = self._call_judge(self.COMPLETENESS_SYSTEM_PROMPT, user_prompt)
-
-        if result and isinstance(result, dict) and "score" in result:
-            if result['score'] in [0, 1, 2]:
-                return {
-                    "score": result['score'],
-                    "reason": result.get("reason", "")
-                }
-
-        return {
-            "score": -1,
-            "reason": "Completeness evaluation failed"
-        }
+        return self._evaluate(self.COMPLETENESS_SYSTEM_PROMPT, user_prompt, "Completeness")
 
     async def evaluate_correctness(self, history: list, response: str) -> dict:
         """
@@ -221,9 +255,7 @@ output:
             response: Final agent response
 
         Returns:
-            dict with:
-                - score: 0/1/2
-                - reason: explanation
+            dict with score (0/1/2) and reason
         """
         if not response or response == "":
             return {
@@ -239,20 +271,7 @@ response: {response}
 output:
 """
 
-        result = self._call_judge(self.CORRECTNESS_SYSTEM_PROMPT, user_prompt)
-
-        if result and isinstance(result, dict) and "score" in result:
-            if result['score'] in [0, 1, 2]:
-                return {
-                    "score": result['score'],
-                    "reason": result.get("reason", "")
-                }
-
-        # Evaluation failed
-        return {
-            "score": -1,
-            "reason": "Correctness evaluation failed"
-        }
+        return self._evaluate(self.CORRECTNESS_SYSTEM_PROMPT, user_prompt, "Correctness")
 
     async def evaluate_response(
         self,
@@ -285,9 +304,8 @@ output:
         # Evaluate completeness
         complete_result = await self.evaluate_completeness(query, final_response)
 
-        # Evaluate correctness (use history excluding final response)
-        history = [turn for turn in generated_convs if turn.get('role') != 'assistant' or 'content' not in turn]
-        correct_result = await self.evaluate_correctness(history, final_response)
+        # Evaluate correctness using the generated conversation history
+        correct_result = await self.evaluate_correctness(generated_convs, final_response)
 
         return {
             "complete": complete_result,

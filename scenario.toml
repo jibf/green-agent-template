@@ -1,0 +1,29 @@
+# ComplexFuncBench Evaluation Scenario
+# This file defines the configuration for running ComplexFuncBench evaluation on AgentBeats
+
+[green_agent]
+endpoint = "http://127.0.0.1:8001"
+cmd = "uv run python src/server.py --host 127.0.0.1 --port 8001"
+
+[[participants]]
+role = "agent"
+endpoint = "http://127.0.0.1:8000"
+# Replace this with your purple agent's command
+# Example: cmd = "uv run python src/server.py --host 127.0.0.1 --port 8000"
+cmd = "echo 'Please set your purple agent command here'"
+
+[config]
+# Number of tasks to run (optional, default: all tasks)
+num_tasks = 10
+
+# Specific sample IDs to test (optional, overrides num_tasks)
+# sample_ids = ["Car-Rental-0", "Hotel-0", "Trip-Planning-0"]
+
+# Data file path (optional, default: "data/ComplexFuncBench.jsonl")
+# data_file = "data/ComplexFuncBench.jsonl"
+
+# Enable response evaluation (optional, default: true)
+# enable_response_eval = true
+
+# Debug mode (optional, default: false)
+# debug = false
