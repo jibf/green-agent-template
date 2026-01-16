@@ -389,41 +389,55 @@ def simple_function_checker(
             expected_type_converted = JAVA_TYPE_CONVERSION[expected_type_description]
 
             if expected_type_description in JAVA_TYPE_CONVERSION:
-                if type(value) != str:
+                # FC mode support: If value is already the correct Python type, skip string conversion
+                # This handles cases where LLM returns native types (bool, int, etc.) instead of strings
+                if isinstance(value, expected_type_converted):
+                    # Value is already the correct type (e.g., bool True instead of string "true")
+                    # This is expected in FC mode, so skip the java_type_converter
+                    pass
+                elif not isinstance(value, str):
                     result["valid"] = False
                     result["error"].append(
-                        f"Incorrect type for parameter {repr(param)}. Expected type String, got {type(value).__name__}. Parameter value: {repr(value)}."
+                        f"Incorrect type for parameter {repr(param)}. Expected type {expected_type_converted.__name__}, got {type(value).__name__}. Parameter value: {repr(value)}."
                     )
                     result["error_type"] = "type_error:java"
                     return result
-
-                if expected_type_description in NESTED_CONVERSION_TYPE_LIST:
-                    nested_type = param_details[param]["items"]["type"]
-                    nested_type_converted = JAVA_TYPE_CONVERSION[nested_type]
-                    value = java_type_converter(
-                        value, expected_type_description, nested_type
-                    )
                 else:
-                    value = java_type_converter(value, expected_type_description)
+                    # Value is a string, convert it using java_type_converter (Prompting mode)
+                    if expected_type_description in NESTED_CONVERSION_TYPE_LIST:
+                        nested_type = param_details[param]["items"]["type"]
+                        nested_type_converted = JAVA_TYPE_CONVERSION[nested_type]
+                        value = java_type_converter(
+                            value, expected_type_description, nested_type
+                        )
+                    else:
+                        value = java_type_converter(value, expected_type_description)
 
         elif language == Language.JAVASCRIPT:
             expected_type_converted = JS_TYPE_CONVERSION[expected_type_description]
 
             if expected_type_description in JS_TYPE_CONVERSION:
-                if type(value) != str:
+                # FC mode support: If value is already the correct Python type, skip string conversion
+                # This handles cases where LLM returns native types (bool, int, etc.) instead of strings
+                if isinstance(value, expected_type_converted):
+                    # Value is already the correct type (e.g., bool True instead of string "true")
+                    # This is expected in FC mode, so skip the js_type_converter
+                    pass
+                elif not isinstance(value, str):
                     result["valid"] = False
                     result["error"].append(
-                        f"Incorrect type for parameter {repr(param)}. Expected type String, got {type(value).__name__}. Parameter value: {repr(value)}."
+                        f"Incorrect type for parameter {repr(param)}. Expected type {expected_type_converted.__name__}, got {type(value).__name__}. Parameter value: {repr(value)}."
                     )
                     result["error_type"] = "type_error:js"
                     return result
-
-                if expected_type_description in NESTED_CONVERSION_TYPE_LIST:
-                    nested_type = param_details[param]["items"]["type"]
-                    nested_type_converted = JS_TYPE_CONVERSION[nested_type]
-                    value = js_type_converter(value, expected_type_description, nested_type)
                 else:
-                    value = js_type_converter(value, expected_type_description)
+                    # Value is a string, convert it using js_type_converter (Prompting mode)
+                    if expected_type_description in NESTED_CONVERSION_TYPE_LIST:
+                        nested_type = param_details[param]["items"]["type"]
+                        nested_type_converted = JS_TYPE_CONVERSION[nested_type]
+                        value = js_type_converter(value, expected_type_description, nested_type)
+                    else:
+                        value = js_type_converter(value, expected_type_description)
 
         elif language == Language.PYTHON:
             expected_type_converted = PYTHON_TYPE_MAPPING[expected_type_description]

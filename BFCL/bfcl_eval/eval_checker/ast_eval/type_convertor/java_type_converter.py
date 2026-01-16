@@ -34,18 +34,18 @@ def java_type_converter(value, expected_type, nested_type=None):
         if not re.match(r"^\'.$\'", value):
             return str(value)  # default to string
         return value  # Remove the single quotes
-    elif expected_type == "Array" or expected_type == "ArrayList":
+    elif expected_type == "Array" or expected_type == "ArrayList" or expected_type == "array":
         return parse_java_collection(value, expected_type, nested_type)
     elif expected_type == "Set":
         raise NotImplementedError("Set conversion is not implemented")
-    elif expected_type == "HashMap":
+    elif expected_type == "HashMap" or expected_type == "object":
         return parse_java_collection(value, expected_type, nested_type)
     elif expected_type == "Hashtable":
         raise NotImplementedError("Set conversion is not implemented")
     elif expected_type == "Queue" or expected_type == "Stack":
         raise NotImplementedError(f"{expected_type} conversion is not implemented")
-    elif expected_type == "String" or expected_type == "any":
-        return str(value)  # we output as string for `any` type
+    elif expected_type == "String" or expected_type == "string" or expected_type == "any":
+        return str(value)  # we output as string for `any` type; support both "String" and "string" (OpenAPI lowercase)
     else:
         raise ValueError(f"Unsupported type: {expected_type}")
 
@@ -59,9 +59,9 @@ def parse_java_collection(
 ) -> Union[List, Dict]:
     if type_str == "ArrayList":
         return parse_arraylist(input_str, nested_type)
-    elif type_str == "Array":
+    elif type_str == "Array" or type_str == "array":
         return parse_array(input_str, nested_type)
-    elif type_str == "HashMap":
+    elif type_str == "HashMap" or type_str == "object":
         return parse_hashmap(input_str)
     else:
         raise ValueError(f"Unsupported type: {type_str}")
@@ -78,7 +78,7 @@ def parse_arraylist(input_str: str, nested_type=None) -> List:
             element_str = element_str.strip()
             if nested_type == "char":
                 element = element_str[1:-1]  # Remove the single quotes
-            elif nested_type == "String":
+            elif nested_type == "String" or nested_type == "string":
                 element = element_str[1:-1]  # Remove the double quotes
             else:
                 element = (
@@ -100,7 +100,7 @@ def parse_arraylist(input_str: str, nested_type=None) -> List:
             value_str = match.strip()
             if nested_type == "char":
                 value = value_str[1:-1]  # Remove the single quotes
-            elif nested_type == "String":
+            elif nested_type == "String" or nested_type == "string":
                 value = value_str[1:-1]  # Remove the double quotes
             else:
                 value = (

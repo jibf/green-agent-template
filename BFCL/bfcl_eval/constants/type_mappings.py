@@ -67,13 +67,16 @@ JAVA_TYPE_CONVERSION = {
     "boolean": bool,
     "char": str,
     "Array": list,
+    "array": list,
     "ArrayList": list,
     "Set": set,
     "HashMap": dict,
     "Hashtable": dict,
-    "Queue": list,  # this can be `queue.Queue` as well, for simplicity we check with list
+    "object": dict,
+    "Queue": list,
     "Stack": list,
     "String": str,
+    "string": str,
     "any": str,
 }
 
