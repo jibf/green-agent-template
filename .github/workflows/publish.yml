@@ -48,10 +48,6 @@ jobs:
             type=semver,pattern={{major}}
             # For main branch, create tag 'latest'
             type=raw,value=latest,enable={{is_default_branch}}
-            # For PRs, create tag 'pr-123'
-            type=ref,event=pr
-            # Add git SHA as tag for traceability
-            type=sha,prefix={{branch}}-
 
       - name: Build and push Docker image
         id: build
