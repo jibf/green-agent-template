@@ -72,7 +72,14 @@ def main():
 
     # Import A2A server components
     import uvicorn
-    from a2a.server import A2AServer
+    from a2a.server.apps import A2AStarletteApplication
+    from a2a.server.request_handlers import DefaultRequestHandler
+    from a2a.server.tasks import InMemoryTaskStore
+    from a2a.types import (
+        AgentCapabilities,
+        AgentCard,
+        AgentSkill,
+    )
 
     # Import the router executor
     from router_executor import RouterExecutor
@@ -82,19 +89,48 @@ def main():
     logger.info(f"Initialized {executor.name}")
     logger.info(f"Description: {executor.description}")
 
-    # Create A2A server
-    server = A2AServer(
-        executor,
-        host=args.host,
-        port=args.port,
-        card_url=args.card_url,
+    # Create agent skill
+    skill = AgentSkill(
+        id="multi_benchmark_evaluation",
+        name="Multi-Benchmark Evaluation",
+        description="Evaluates agents on BFCL, ComplexFuncBench, and Tau2 benchmarks. Specify 'benchmark' in config.",
+        tags=["benchmark", "evaluation", "BFCL", "ComplexFuncBench", "Tau2", "function-calling"],
+        examples=[
+            '{"participants": {"agent": "http://localhost:8000"}, "config": {"benchmark": "bfcl", "test_category": "v3_v4", "num_tasks": 10}}',
+            '{"participants": {"agent": "http://localhost:8000"}, "config": {"benchmark": "cfb", "num_tasks": 10}}',
+            '{"participants": {"agent": "http://localhost:8000"}, "config": {"benchmark": "tau2", "domain": "airline", "num_tasks": 5}}'
+        ]
+    )
+
+    # Create agent card
+    agent_card = AgentCard(
+        name="MultiBenchmarkGreenAgent",
+        description="Unified green agent supporting BFCL, ComplexFuncBench, and Tau2 benchmarks with quality control pipeline.",
+        url=args.card_url or f"http://{args.host}:{args.port}/",
+        version='1.0.0',
+        default_input_modes=['text'],
+        default_output_modes=['text'],
+        capabilities=AgentCapabilities(streaming=True),
+        skills=[skill]
+    )
+
+    # Create request handler and app
+    request_handler = DefaultRequestHandler(
+        agent_executor=executor,
+        task_store=InMemoryTaskStore()
+    )
+
+    app = A2AStarletteApplication(
+        request_handler=request_handler,
+        agent_card=agent_card
     )
 
     # Start the server
     logger.info(f"Starting server on {args.host}:{args.port}")
+    logger.info(f"Agent card available at: http://{args.host}:{args.port}/.well-known/agent-card.json")
     try:
         uvicorn.run(
-            server.app,
+            app,
             host=args.host,
             port=args.port,
             log_level="info"
