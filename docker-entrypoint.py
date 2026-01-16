@@ -120,9 +120,9 @@ def main():
         task_store=InMemoryTaskStore()
     )
 
-    app = A2AStarletteApplication(
-        request_handler=request_handler,
-        agent_card=agent_card
+    server = A2AStarletteApplication(
+        agent_card=agent_card,
+        http_handler=request_handler
     )
 
     # Start the server
@@ -130,7 +130,7 @@ def main():
     logger.info(f"Agent card available at: http://{args.host}:{args.port}/.well-known/agent-card.json")
     try:
         uvicorn.run(
-            app,
+            server.build(),
             host=args.host,
             port=args.port,
             log_level="info"
