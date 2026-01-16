@@ -14,15 +14,15 @@ from bfcl_eval.model_handler.utils import (
     retry_with_backoff,
     system_prompt_pre_processing_chat_model,
 )
-from google import genai
-from google.genai.types import (
-    AutomaticFunctionCallingConfig,
-    Content,
-    GenerateContentConfig,
-    Part,
-    ThinkingConfig,
-    Tool,
-)
+# from google import genai
+# from google.genai.types import (
+#     AutomaticFunctionCallingConfig,
+#     Content,
+#     GenerateContentConfig,
+#     Part,
+#     ThinkingConfig,
+#     Tool,
+# )
 
 
 class GeminiHandler(BaseHandler):
