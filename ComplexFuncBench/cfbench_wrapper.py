@@ -15,7 +15,7 @@ import nest_asyncio
 
 nest_asyncio.apply()
 
-cfbench_path = os.path.join(os.path.dirname(__file__), '..', 'ComplexFuncBench')
+cfbench_path = os.path.dirname(__file__)
 sys.path.insert(0, cfbench_path)
 
 # Change working directory to ComplexFuncBench

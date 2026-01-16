@@ -1,3 +1,11 @@
+import sys
+from pathlib import Path
+
+# Add project root to Python path (in case this is imported before server.py)
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
 from a2a.server.tasks import TaskUpdater
@@ -13,7 +21,7 @@ from a2a.utils import (
     new_task,
 )
 
-from agent import Agent
+from ComplexFuncBench.cfbench_agent import Agent
 
 
 TERMINAL_STATES = {

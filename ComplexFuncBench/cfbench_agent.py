@@ -9,12 +9,18 @@ from a2a.server.tasks import TaskUpdater
 from a2a.types import Message, TaskState, Part, TextPart, DataPart
 from a2a.utils import get_message_text, new_agent_text_message
 from dotenv import load_dotenv
+import sys
+from pathlib import Path
+
+# Add project root to Python path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
 load_dotenv()
 
-from messenger import Messenger
-from cfbench_wrapper import ComplexFuncBenchRunner
-from response_evaluator import ResponseEvaluator
+from ComplexFuncBench.messenger import Messenger
+from ComplexFuncBench.cfbench_wrapper import ComplexFuncBenchRunner
+from ComplexFuncBench.response_evaluator import ResponseEvaluator
 
 
 class MockArgs:
@@ -74,13 +80,14 @@ class Agent:
         sample_ids = request.config.get("sample_ids", None)
         data_file = request.config.get("data_file", "data/ComplexFuncBench.jsonl")
         enable_response_eval = request.config.get("enable_response_eval", True)
+        invalid_tasks_file = request.config.get("invalid_tasks_file", "invalid_tasks.txt")
 
         self.logger = logging.getLogger(f"cfbench_evaluator")
         self.logger.setLevel(logging.INFO)
 
         # Load test data
         try:
-            test_data = self._load_test_data(data_file)
+            test_data = self._load_test_data(data_file, invalid_tasks_file)
         except Exception as e:
             await updater.reject(new_agent_text_message(f"Failed to load data: {e}"))
             return
@@ -233,18 +240,32 @@ class Agent:
         # Clean up
         self.messenger.reset()
 
-    def _load_test_data(self, data_file: str) -> list:
+    def _load_test_data(self, data_file: str, invalid_tasks_file: str) -> list:
         """Load test data from JSONL file."""
         if not os.path.exists(data_file):
             raise FileNotFoundError(f"Data file not found: {data_file}")
+    
+        invalid_tasks = []
+        if os.path.exists(invalid_tasks_file):
+            with open(invalid_tasks_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        invalid_tasks.append(line.strip())
 
         test_data = []
         with open(data_file, 'r', encoding='utf-8') as f:
             for line in f:
                 if line.strip():
                     test_data.append(json.loads(line))
+        
+        filtered_data = []
+        for task in test_data:
+            if task["id"] not in invalid_tasks:
+                filtered_data.append(task)
+        
+        logging.info(f"Loaded {len(filtered_data)}/{len(test_data)} valid tasks after filtering invalid tasks.")
 
-        return test_data
+        return filtered_data
 
     def _calculate_metrics(self, results: list) -> tuple[str, dict]:
         """Calculate evaluation metrics and generate summary."""
