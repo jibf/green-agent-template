@@ -304,6 +304,7 @@ The pipeline currently supports:
 - DrafterBench
 - ACEBench
 - BFCL (v3)
+- BFCL v4
 - ComplexFuncBench
 
 ## Troubleshooting
