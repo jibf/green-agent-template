@@ -25,8 +25,8 @@ def test_agent_card(agent_url):
 
 def test_health_endpoint(agent_url):
     """Test that the server is responsive"""
-    response = httpx.get(agent_url, timeout=10, follow_redirects=True)
-    assert response.status_code in [200, 404]  # 404 is ok, means server is running
+    response = httpx.get(f"{agent_url}/.well-known/agent-card.json", timeout=10)
+    assert response.status_code == 200
 
 
 @pytest.mark.asyncio
