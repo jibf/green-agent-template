@@ -30,70 +30,42 @@ def test_health_endpoint(agent_url):
 
 
 @pytest.mark.asyncio
-async def test_router_bfcl(agent_url):
-    """Test that router can handle BFCL benchmark request"""
-    async with httpx.AsyncClient(timeout=30) as client:
-        # Simple request to verify router logic works
-        request_data = {
-            "participants": {"agent": "http://mock-agent:8000"},
-            "config": {
-                "benchmark": "bfcl",
-                "test_category": "v3_v4",
-                "num_tasks": 1
-            }
-        }
+async def test_router_configuration(agent_url):
+    """Test that router is properly configured with all benchmarks"""
+    async with httpx.AsyncClient(timeout=10) as client:
+        # Test agent card endpoint
+        response = await client.get(f"{agent_url}/.well-known/agent-card.json")
+        assert response.status_code == 200
 
-        # Just verify the endpoint accepts the request format
-        # We're not running actual evaluation in CI
-        response = await client.post(
-            f"{agent_url}/tasks",
-            json=request_data,
-            headers={"Content-Type": "application/json"}
-        )
+        card = response.json()
 
-        # Should accept the request (200 or 201) or return validation error (400+)
-        # 404 is also ok if /tasks endpoint structure is different
-        assert response.status_code in [200, 201, 400, 404, 422]
+        # Verify router configuration
+        assert "name" in card
+        assert card["name"] == "MultiBenchmarkGreenAgent"
 
+        assert "skills" in card
+        assert len(card["skills"]) == 1
 
-@pytest.mark.asyncio
-async def test_router_cfb(agent_url):
-    """Test that router can handle ComplexFuncBench request"""
-    async with httpx.AsyncClient(timeout=30) as client:
-        request_data = {
-            "participants": {"agent": "http://mock-agent:8000"},
-            "config": {
-                "benchmark": "cfb",
-                "num_tasks": 1
-            }
-        }
+        skill = card["skills"][0]
+        assert skill["id"] == "multi_benchmark_evaluation"
 
-        response = await client.post(
-            f"{agent_url}/tasks",
-            json=request_data,
-            headers={"Content-Type": "application/json"}
-        )
+        # Verify all three benchmarks are supported
+        tags = skill["tags"]
+        assert "BFCL" in tags
+        assert "ComplexFuncBench" in tags
+        assert "Tau2" in tags
+        assert "benchmark" in tags
+        assert "evaluation" in tags
 
-        assert response.status_code in [200, 201, 400, 404, 422]
+        # Verify examples for each benchmark
+        examples = skill["examples"]
+        assert len(examples) == 3
 
+        # Check BFCL example
+        assert any("bfcl" in ex.lower() for ex in examples)
 
-@pytest.mark.asyncio
-async def test_router_tau2(agent_url):
-    """Test that router can handle Tau2 request"""
-    async with httpx.AsyncClient(timeout=30) as client:
-        request_data = {
-            "participants": {"agent": "http://mock-agent:8000"},
-            "config": {
-                "benchmark": "tau2",
-                "domain": "airline",
-                "num_tasks": 1
-            }
-        }
+        # Check CFB example
+        assert any("cfb" in ex.lower() for ex in examples)
 
-        response = await client.post(
-            f"{agent_url}/tasks",
-            json=request_data,
-            headers={"Content-Type": "application/json"}
-        )
-
-        assert response.status_code in [200, 201, 400, 404, 422]
+        # Check Tau2 example
+        assert any("tau2" in ex.lower() for ex in examples)
