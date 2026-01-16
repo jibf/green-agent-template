@@ -1,0 +1,23 @@
+# ComplexFuncBench - Full Evaluation
+# This scenario runs all ComplexFuncBench test cases covering complex function calling with real Booking.com API
+#
+# Quality Control:
+# - 161 invalid tasks automatically filtered (GT errors, ambiguous prompts, evaluation issues)
+# - Total: 839 high-quality test cases (from 1,000 original)
+#
+# Features: Multi-step calls, user constraints, parameter reasoning, long parameters (>500 tokens), long context (128k)
+
+[green_agent]
+endpoint = "http://127.0.0.1:8001"
+# Local development command (not used by AgentBeats platform)
+cmd = "uv run python docker-entrypoint.py --host 127.0.0.1 --port 8001"
+
+[[participants]]
+role = "agent"
+endpoint = "http://127.0.0.1:8000"
+# Replace with your purple agent command for local testing
+cmd = "echo 'Please set your purple agent command here'"
+
+[config]
+benchmark = "cfb"
+# Full evaluation - all tasks will be run

@@ -1,0 +1,24 @@
+# Tau2 Benchmark - Full Evaluation (airline domain)
+# This scenario runs the complete Tau2 benchmark for customer service agents
+# Tests realistic multi-turn conversations and tool usage
+#
+# Quality Control:
+# - 96 invalid tasks automatically filtered (GT errors, ambiguous prompts, evaluation issues)
+# - Ensures more reliable evaluation of customer service capabilities
+
+[green_agent]
+endpoint = "http://127.0.0.1:9009"
+# Local development command (not used by AgentBeats platform)
+cmd = "uv run python docker-entrypoint.py --host 127.0.0.1 --port 9009"
+
+[[participants]]
+role = "agent"
+endpoint = "http://127.0.0.1:8000"
+# Replace with your purple agent command for local testing
+cmd = "echo 'Please set your purple agent command here'"
+
+[config]
+benchmark = "tau2"
+domain = "airline"  # Options: airline, retail, telecom, mock
+# Full evaluation - all tasks in the domain will be run
+user_llm = "openai/gpt-4o"  # LLM for user simulator (uses OPENAI_API_KEY and OPENAI_BASE_URL from env)

@@ -1,0 +1,17 @@
+# ComplexFuncBench - Debug Mode (limited to 10 tasks)
+# Use this for quick testing and debugging
+
+[green_agent]
+endpoint = "http://127.0.0.1:8001"
+# Local development command (not used by AgentBeats platform)
+cmd = "uv run python docker-entrypoint.py --host 127.0.0.1 --port 8001"
+
+[[participants]]
+role = "agent"
+endpoint = "http://127.0.0.1:8000"
+# Replace with your purple agent command for local testing
+cmd = "echo 'Please set your purple agent command here'"
+
+[config]
+benchmark = "cfb"
+num_tasks = 10  # Debug mode: only run first 10 tasks

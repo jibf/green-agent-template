@@ -1,0 +1,19 @@
+# Tau2 Benchmark - Debug Mode (limited to 5 tasks)
+# Use this for quick testing and debugging
+
+[green_agent]
+endpoint = "http://127.0.0.1:9009"
+# Local development command (not used by AgentBeats platform)
+cmd = "uv run python docker-entrypoint.py --host 127.0.0.1 --port 9009"
+
+[[participants]]
+role = "agent"
+endpoint = "http://127.0.0.1:8000"
+# Replace with your purple agent command for local testing
+cmd = "echo 'Please set your purple agent command here'"
+
+[config]
+benchmark = "tau2"
+domain = "airline"  # Options: airline, retail, telecom, mock
+num_tasks = 5  # Debug mode: only run first 5 tasks
+user_llm = "openai/gpt-4o"  # LLM for user simulator

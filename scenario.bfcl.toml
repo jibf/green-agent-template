@@ -1,0 +1,25 @@
+# BFCL Benchmark - Full Evaluation (v3_v4: multi-turn + agentic tests)
+# This scenario runs the complete v3_v4 test suite which includes:
+# - Multi-turn tests: base, miss_func, miss_param, long_context (4 categories)
+# - Agentic tests: memory_kv, memory_vector, memory_rec_sum, web_search_base, web_search_no_snippet (5 categories)
+#
+# Quality Control:
+# - 139 invalid tasks automatically filtered (GT errors, ambiguous prompts, evaluation issues)
+# - Total: ~400 high-quality test cases in v3_v4 category
+# - Full benchmark: 4,567 valid tests (from 4,706 original)
+
+[green_agent]
+endpoint = "http://127.0.0.1:8001"
+# Local development command (not used by AgentBeats platform)
+cmd = "uv run python docker-entrypoint.py --host 127.0.0.1 --port 8001"
+
+[[participants]]
+role = "agent"
+endpoint = "http://127.0.0.1:8000"
+# Replace with your purple agent command for local testing
+cmd = "echo 'Please set your purple agent command here'"
+
+[config]
+benchmark = "bfcl"
+test_category = "v3_v4"  # Recommended: multi-turn + agentic tests
+# Full evaluation - all tasks in v3_v4 category will be run
