@@ -17,7 +17,6 @@ COPY router_executor.py router_executor.py
 # Copy dependency files
 COPY pyproject.toml pyproject.toml
 COPY uv.lock uv.lock
-COPY .python-version .python-version
 
 # Copy README for documentation
 COPY README.md README.md
