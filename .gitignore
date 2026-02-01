@@ -12,3 +12,8 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Test output files
+test_bfcl_result.json
+test_cfb_result.json
+test_tau2_result.json

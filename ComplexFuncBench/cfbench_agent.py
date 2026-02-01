@@ -204,9 +204,29 @@ class Agent:
 
                 # Log progress
                 status = "✓" if result['success'] else "✗"
+                # Handle different message types: str, dict, or list
+                if isinstance(message, str):
+                    message_text = message
+                elif isinstance(message, dict):
+                    message_text = message.get('content', 'Error')
+                elif isinstance(message, list):
+                    # Multiple errors - take the first one or summarize
+                    if len(message) > 0:
+                        first_error = message[0]
+                        if isinstance(first_error, dict):
+                            message_text = first_error.get('content', 'Multiple errors')
+                        else:
+                            message_text = str(first_error)
+                        if len(message) > 1:
+                            message_text += f" (+{len(message)-1} more errors)"
+                    else:
+                        message_text = 'Unknown error'
+                else:
+                    message_text = 'Unknown error'
+
                 await updater.update_status(
                     TaskState.working,
-                    new_agent_text_message(f"{status} Task {task_id}: {message if isinstance(message, str) else message.get('content', 'Error')}")
+                    new_agent_text_message(f"{status} Task {task_id}: {message_text}")
                 )
 
             except Exception as e:
