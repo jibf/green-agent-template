@@ -46,6 +46,28 @@ This green agent supports **three major function calling benchmarks**:
 
 ## Quick Start
 
+### 🚀 Local Testing (Fastest - Recommended for Development)
+
+Skip Docker builds and test your changes in ~30 seconds:
+
+```bash
+# Terminal 1: Start purple agent
+cd ../agent-template && uv run agentbeats serve --port 8000
+
+# Terminal 2: Start green agent
+cd green-agent-template && uv run python docker-entrypoint.py --port 8001
+
+# Terminal 3: Run tests
+./quick-test.sh cfb 2   # Test ComplexFuncBench with 2 tasks
+```
+
+**📖 See [QUICKSTART_LOCAL.md](QUICKSTART_LOCAL.md) for complete local testing guide**
+
+**Speed comparison:**
+- Local testing: ~30 seconds (2 tasks)
+- Docker + CI: ~5-10 minutes
+- **Save 10-20x time during development!**
+
 ### Local Development
 
 ```bash
