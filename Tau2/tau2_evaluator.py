@@ -68,7 +68,42 @@ def tools_to_str(tools: List[Tool]) -> str:
 
 
 def get_task_objects(domain: str, task_ids: Optional[List[str]], num_tasks: Optional[int] = None, invalid_tasks: List[str] = []) -> List[Any]:
-    """Get task objects for the domain, optionally limited to num_tasks."""
+    """
+    Get task objects for the domain, optionally limited to num_tasks.
+
+    If domain is "all", loads tasks from all available domains (airline, retail, telecom).
+    Each task is tagged with its domain for proper evaluation.
+    """
+    # Handle "all" domain - load tasks from all domains
+    if domain.lower() == "all":
+        all_domains = ["airline", "retail", "telecom"]
+        all_tasks = []
+
+        for d in all_domains:
+            task_split_name = "base"
+            domain_tasks = get_tasks(task_set_name=d, task_split_name=task_split_name)
+
+            # Filter invalid tasks
+            filtered_tasks = []
+            for task in domain_tasks:
+                if f"{d}_{task.id}" not in invalid_tasks:
+                    # Tag task with its domain for later use
+                    task._domain = d
+                    filtered_tasks.append(task)
+
+            print(f"Domain {d}: {len(filtered_tasks)}/{len(domain_tasks)} tasks (after filtering)")
+
+            # Apply num_tasks limit per domain
+            if num_tasks is not None:
+                filtered_tasks = filtered_tasks[:num_tasks]
+                print(f"  Limited to {len(filtered_tasks)} tasks")
+
+            all_tasks.extend(filtered_tasks)
+
+        print(f"Total tasks across all domains: {len(all_tasks)}")
+        return all_tasks
+
+    # Single domain (original logic)
     task_set_name = domain
     task_split_name = "base"
     if task_ids is None:
@@ -82,6 +117,8 @@ def get_task_objects(domain: str, task_ids: Optional[List[str]], num_tasks: Opti
     new_tasks = []
     for task in tasks:
         if f"{domain}_{task.id}" not in invalid_tasks:
+            # Tag single-domain tasks too
+            task._domain = domain
             new_tasks.append(task)
     print(f"Remaining  {len(new_tasks)}/{len(tasks)} tasks.")
     if num_tasks is not None:
@@ -305,44 +342,72 @@ class Tau2Evaluator(GreenAgent):
         # Get the purple agent URL
         agent_url = str(req.participants["agent"])
 
-        # Get task objects
+        # Get task objects (handles both single domain and "all" domains)
         invalid_tasks = []
         with open("./Tau2/invalid_tasks.txt", "r") as f:
             for line in f:
                 invalid_tasks.append(line.strip())
         tasks = get_task_objects(domain, task_ids, num_tasks, invalid_tasks)
-        logger.info(f"Running {len(tasks)} tasks for domain {domain}")
 
-        await updater.update_status(
-            TaskState.working,
-            new_agent_text_message(f"Starting evaluation of {len(tasks)} tasks in {domain} domain")
-        )
+        is_multi_domain = domain.lower() == "all"
+        if is_multi_domain:
+            logger.info(f"Running {len(tasks)} tasks across multiple domains")
+            await updater.update_status(
+                TaskState.working,
+                new_agent_text_message(f"Starting multi-domain evaluation: {len(tasks)} tasks")
+            )
+        else:
+            logger.info(f"Running {len(tasks)} tasks for domain {domain}")
+            await updater.update_status(
+                TaskState.working,
+                new_agent_text_message(f"Starting evaluation of {len(tasks)} tasks in {domain} domain")
+            )
 
         metrics: dict[str, Any] = {"tasks": {}}
+        # For multi-domain, track per-domain stats
+        if is_multi_domain:
+            domain_stats: dict[str, dict] = {}
 
         try:
             for task in tasks:
                 task_id = task.id
-                logger.info(f"Running task {task_id}...")
+                # Use the domain tagged on the task (important for "all" mode)
+                task_domain = getattr(task, '_domain', domain)
+
+                logger.info(f"Running task {task_id} (domain: {task_domain})...")
                 await updater.update_status(
                     TaskState.working,
-                    new_agent_text_message(f"Running task {task_id}...")
+                    new_agent_text_message(f"[{task_domain}] Running task {task_id}...")
                 )
 
                 try:
                     reward = await self._run_single_task(
                         agent_url=agent_url,
-                        domain=domain,
+                        domain=task_domain,  # Use task-specific domain
                         task=task,
                         max_steps=max_steps,
                         user_llm=user_llm,
                         user_llm_args=user_llm_args,
                     )
                     metrics["tasks"][task_id] = reward
-                    logger.info(f"Task {task_id} completed with reward: {reward}")
+                    logger.info(f"Task {task_id} ({task_domain}) completed with reward: {reward}")
+
+                    # Track per-domain stats for multi-domain mode
+                    if is_multi_domain:
+                        if task_domain not in domain_stats:
+                            domain_stats[task_domain] = {"rewards": [], "count": 0}
+                        domain_stats[task_domain]["rewards"].append(reward)
+                        domain_stats[task_domain]["count"] += 1
+
                 except Exception as e:
-                    logger.error(f"Task {task_id} failed: {e}", exc_info=True)
+                    logger.error(f"Task {task_id} ({task_domain}) failed: {e}", exc_info=True)
                     metrics["tasks"][task_id] = 0.0
+
+                    if is_multi_domain:
+                        if task_domain not in domain_stats:
+                            domain_stats[task_domain] = {"rewards": [], "count": 0}
+                        domain_stats[task_domain]["rewards"].append(0.0)
+                        domain_stats[task_domain]["count"] += 1
 
             time_used = time.time() - start_time
             total_reward = sum(metrics["tasks"].values())
@@ -359,12 +424,37 @@ class Tau2Evaluator(GreenAgent):
             }
 
             # Format task results for display
-            task_results_str = "\n".join(
-                f"  {task_id}: {'✓' if reward == 1.0 else '✗'} ({reward})"
-                for task_id, reward in metrics["tasks"].items()
-            )
+            if is_multi_domain:
+                # Group results by domain
+                domain_results_parts = []
+                for d in sorted(domain_stats.keys()):
+                    d_rewards = domain_stats[d]["rewards"]
+                    d_score = sum(d_rewards)
+                    d_count = domain_stats[d]["count"]
+                    d_pass_rate = (d_score / d_count * 100) if d_count > 0 else 0
+                    domain_results_parts.append(
+                        f"  {d}: {d_pass_rate:.1f}% ({int(d_score)}/{d_count} tasks)"
+                    )
+                    result_data[f"{d}_stats"] = {
+                        "score": d_score,
+                        "count": d_count,
+                        "pass_rate": d_pass_rate
+                    }
 
-            summary = f"""Tau2 Benchmark Results
+                summary = f"""Tau2 Multi-Domain Benchmark Results
+Overall Pass Rate: {pass_rate:.1f}% ({int(total_reward)}/{num_completed} tasks)
+Time: {time_used:.1f}s
+
+Domain Breakdown:
+{chr(10).join(domain_results_parts)}"""
+            else:
+                # Single domain results
+                task_results_str = "\n".join(
+                    f"  {task_id}: {'✓' if reward == 1.0 else '✗'} ({reward})"
+                    for task_id, reward in metrics["tasks"].items()
+                )
+
+                summary = f"""Tau2 Benchmark Results
 Domain: {domain}
 Tasks: {num_completed}
 Pass Rate: {pass_rate:.1f}% ({int(total_reward)}/{num_completed})

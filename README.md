@@ -157,10 +157,17 @@ num_tasks = 10           # Optional: limit number of tasks
 ```toml
 [config]
 benchmark = "tau2"
-domain = "airline"       # Options: airline, retail, telecom, mock
-num_tasks = 5            # Optional: limit number of tasks
+domain = "airline"       # Options: airline, retail, telecom, mock, all
+num_tasks = 5            # Optional: limit number of tasks (per domain if domain="all")
 user_llm = "openai/gpt-4o"  # LLM for user simulator
 ```
+
+**Domain options**:
+- `"airline"` - Airline customer service scenarios
+- `"retail"` - Retail customer service scenarios
+- `"telecom"` - Telecom customer service scenarios
+- `"mock"` - Mock domain for testing
+- `"all"` - **Run all domains sequentially** (airline → retail → telecom)
 
 ## Environment Variables
 
