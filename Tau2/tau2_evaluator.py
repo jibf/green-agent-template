@@ -448,6 +448,7 @@ class Tau2Evaluator(GreenAgent):
             pass_rate = (total_reward / num_completed * 100) if num_completed > 0 else 0
 
             result_data = {
+                "config": req.config,
                 "domain": domain,
                 "score": total_reward,
                 "max_score": num_completed,

@@ -232,7 +232,7 @@ class Agent:
                     "eval_result": None
                 })
 
-        summary, result_data = self._calculate_metrics(results)
+        summary, result_data = self._calculate_metrics(results, request.config)
 
         await updater.add_artifact(
             parts=[
@@ -312,7 +312,7 @@ class Agent:
 
         return dependencies, task_id_to_index
 
-    def _calculate_metrics(self, results: list) -> tuple[str, dict]:
+    def _calculate_metrics(self, results: list, config: dict) -> tuple[str, dict]:
         """Calculate evaluation metrics."""
         total_samples = len(results)
         successful_samples = sum(1 for r in results if r['success'])
@@ -368,6 +368,7 @@ Detailed Task Results:
 """
 
         result_data = {
+            "config": config,
             "accuracy": overall_accuracy,
             "correct_count": successful_samples,
             "total_count": total_samples,

@@ -1,26 +1,26 @@
 [
   {
     "name": "BFCL - Overall",
-    "query": "SELECT results.participants.agent AS id, ROUND(res.accuracy, 1) AS \"Accuracy (%)\", res.correct_count AS \"✓ Correct\", res.total_count AS \"# Total\" FROM results CROSS JOIN UNNEST(results.results) AS r(res) WHERE results.config.benchmark = 'bfcl' ORDER BY \"Accuracy (%)\" DESC, \"# Total\" DESC"
+    "query": "SELECT results.participants.agent AS id, ROUND(res.accuracy, 1) AS \"Accuracy (%)\", res.correct_count AS \"✓ Correct\", res.total_count AS \"# Total\" FROM read_json_auto('results/*.json') AS results CROSS JOIN UNNEST(results.results) AS r(res) WHERE res.config.benchmark = 'bfcl' ORDER BY \"Accuracy (%)\" DESC, \"# Total\" DESC"
   },
   {
     "name": "BFCL - By Category",
-    "query": "SELECT results.participants.agent AS id, category_key AS \"Category\", ROUND((category_val.success::FLOAT / category_val.total * 100), 1) AS \"Accuracy (%)\", category_val.success AS \"✓\", category_val.total AS \"Total\" FROM results CROSS JOIN UNNEST(results.results) AS r(res) CROSS JOIN UNNEST(MAP_ENTRIES(res.category_stats)) AS c(category_key, category_val) WHERE results.config.benchmark = 'bfcl' ORDER BY id, \"Accuracy (%)\" DESC"
+    "query": "SELECT results.participants.agent AS id, kv.key AS \"Category\", ROUND((json_extract(kv.value, '$.success')::FLOAT / json_extract(kv.value, '$.total')::FLOAT * 100), 1) AS \"Accuracy (%)\", json_extract(kv.value, '$.success')::INTEGER AS \"✓\", json_extract(kv.value, '$.total')::INTEGER AS \"Total\" FROM read_json_auto('results/*.json') AS results CROSS JOIN UNNEST(results.results) AS r(res) CROSS JOIN (SELECT * FROM json_each(res.category_stats)) AS kv WHERE res.config.benchmark = 'bfcl' ORDER BY id, \"Accuracy (%)\" DESC"
   },
   {
     "name": "ComplexFuncBench - Overall",
-    "query": "SELECT results.participants.agent AS id, ROUND(res.overall_success_rate, 1) AS \"Success Rate (%)\", ROUND(res.overall_call_accuracy, 1) AS \"Call Acc (%)\", res.successful_samples || '/' || res.total_samples AS \"Tasks\", ROUND(COALESCE(res.avg_completeness, 0), 2) AS \"Completeness\", ROUND(COALESCE(res.avg_correctness, 0), 2) AS \"Correctness\" FROM results CROSS JOIN UNNEST(results.results) AS r(res) WHERE results.config.benchmark = 'cfb' OR results.config.benchmark = 'complexfuncbench' ORDER BY \"Success Rate (%)\" DESC, \"Call Acc (%)\" DESC"
+    "query": "SELECT results.participants.agent AS id, ROUND(res.overall_success_rate, 1) AS \"Success Rate (%)\", ROUND(res.overall_call_accuracy, 1) AS \"Call Acc (%)\", res.successful_samples || '/' || res.total_samples AS \"Tasks\", ROUND(COALESCE(res.avg_completeness, 0), 2) AS \"Completeness\", ROUND(COALESCE(res.avg_correctness, 0), 2) AS \"Correctness\" FROM read_json_auto('results/*.json') AS results CROSS JOIN UNNEST(results.results) AS r(res) WHERE res.config.benchmark = 'cfb' OR res.config.benchmark = 'complexfuncbench' ORDER BY \"Success Rate (%)\" DESC, \"Call Acc (%)\" DESC"
   },
   {
     "name": "ComplexFuncBench - By Domain",
-    "query": "SELECT results.participants.agent AS id, domain_key AS \"Domain\", ROUND((domain_val.success::FLOAT / domain_val.total * 100), 1) AS \"Success Rate (%)\", domain_val.success || '/' || domain_val.total AS \"Tasks\", ROUND((domain_val.correct_calls::FLOAT / domain_val.total_calls * 100), 1) AS \"Call Acc (%)\" FROM results CROSS JOIN UNNEST(results.results) AS r(res) CROSS JOIN UNNEST(MAP_ENTRIES(res.domain_stats)) AS d(domain_key, domain_val) WHERE results.config.benchmark = 'cfb' OR results.config.benchmark = 'complexfuncbench' ORDER BY id, \"Success Rate (%)\" DESC"
+    "query": "SELECT results.participants.agent AS id, kv.key AS \"Domain\", ROUND((json_extract(kv.value, '$.success')::FLOAT / json_extract(kv.value, '$.total')::FLOAT * 100), 1) AS \"Success Rate (%)\", json_extract(kv.value, '$.success')::INTEGER || '/' || json_extract(kv.value, '$.total')::INTEGER AS \"Tasks\", ROUND((json_extract(kv.value, '$.correct_calls')::FLOAT / json_extract(kv.value, '$.total_calls')::FLOAT * 100), 1) AS \"Call Acc (%)\" FROM read_json_auto('results/*.json') AS results CROSS JOIN UNNEST(results.results) AS r(res) CROSS JOIN (SELECT * FROM json_each(res.domain_stats)) AS kv WHERE res.config.benchmark = 'cfb' OR res.config.benchmark = 'complexfuncbench' ORDER BY id, \"Success Rate (%)\" DESC"
   },
   {
     "name": "Tau2 - Single Domain",
-    "query": "SELECT results.participants.agent AS id, res.domain AS \"Domain\", ROUND(res.pass_rate, 1) AS \"Pass Rate (%)\", CAST(res.score AS INTEGER) || '/' || res.max_score AS \"Score\", ROUND(res.time_used, 1) AS \"Time (s)\" FROM results CROSS JOIN UNNEST(results.results) AS r(res) WHERE results.config.benchmark = 'tau2' AND res.domain != 'all' ORDER BY \"Domain\", \"Pass Rate (%)\" DESC, \"Time (s)\" ASC"
+    "query": "SELECT results.participants.agent AS id, res.domain AS \"Domain\", ROUND(res.pass_rate, 1) AS \"Pass Rate (%)\", CAST(res.score AS INTEGER) || '/' || res.max_score AS \"Score\", ROUND(res.time_used, 1) AS \"Time (s)\" FROM read_json_auto('results/*.json') AS results CROSS JOIN UNNEST(results.results) AS r(res) WHERE res.config.benchmark = 'tau2' AND res.domain != 'all' ORDER BY \"Domain\", \"Pass Rate (%)\" DESC, \"Time (s)\" ASC"
   },
   {
     "name": "Tau2 - Multi Domain",
-    "query": "SELECT results.participants.agent AS id, ROUND(res.pass_rate, 1) AS \"Overall Pass Rate (%)\", CAST(res.score AS INTEGER) || '/' || res.max_score AS \"Overall Score\", ROUND(res.airline_stats.pass_rate, 1) AS \"Airline (%)\", ROUND(res.retail_stats.pass_rate, 1) AS \"Retail (%)\", ROUND(res.telecom_stats.pass_rate, 1) AS \"Telecom (%)\", ROUND(res.time_used, 1) AS \"Time (s)\" FROM results CROSS JOIN UNNEST(results.results) AS r(res) WHERE results.config.benchmark = 'tau2' AND res.domain = 'all' ORDER BY \"Overall Pass Rate (%)\" DESC, \"Time (s)\" ASC"
+    "query": "SELECT results.participants.agent AS id, ROUND(res.pass_rate, 1) AS \"Overall Pass Rate (%)\", CAST(res.score AS INTEGER) || '/' || res.max_score AS \"Overall Score\", ROUND(res.airline_stats.pass_rate, 1) AS \"Airline (%)\", ROUND(res.retail_stats.pass_rate, 1) AS \"Retail (%)\", ROUND(res.telecom_stats.pass_rate, 1) AS \"Telecom (%)\", ROUND(res.time_used, 1) AS \"Time (s)\" FROM read_json_auto('results/*.json') AS results CROSS JOIN UNNEST(results.results) AS r(res) WHERE res.config.benchmark = 'tau2' AND res.domain = 'all' ORDER BY \"Overall Pass Rate (%)\" DESC, \"Time (s)\" ASC"
   }
 ]

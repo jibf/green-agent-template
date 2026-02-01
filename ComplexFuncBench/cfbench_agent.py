@@ -247,7 +247,7 @@ class Agent:
                 })
 
         # Generate final report
-        summary, result_data = self._calculate_metrics(results)
+        summary, result_data = self._calculate_metrics(results, request.config)
 
         await updater.add_artifact(
             parts=[
@@ -287,7 +287,7 @@ class Agent:
 
         return filtered_data
 
-    def _calculate_metrics(self, results: list) -> tuple[str, dict]:
+    def _calculate_metrics(self, results: list, config: dict) -> tuple[str, dict]:
         """Calculate evaluation metrics and generate summary."""
         total_samples = len(results)
         successful_samples = sum(1 for r in results if r['success'])
@@ -368,6 +368,7 @@ Task Results:
 """
 
         result_data = {
+            "config": config,
             "overall_success_rate": overall_success_rate,
             "overall_call_accuracy": overall_call_accuracy,
             "successful_samples": successful_samples,
