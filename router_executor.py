@@ -38,6 +38,16 @@ class RouterExecutor:
             "Specify the benchmark in the config field of the evaluation request."
         )
 
+    async def execute(
+        self, message: Message, updater: TaskUpdater
+    ) -> AsyncIterator[Artifact]:
+        """
+        Execute method required by A2A framework.
+        Routes to run() for backward compatibility.
+        """
+        async for artifact in self.run(message, updater):
+            yield artifact
+
     async def run(
         self, message: Message, updater: TaskUpdater
     ) -> AsyncIterator[Artifact]:
