@@ -101,3 +101,12 @@ scenario*.toml
 # Documentation
 TESTING.md
 DOCKER_DEPLOYMENT.md
+
+# Tau2 unnecessary files
+Tau2/tau2-bench/web/
+Tau2/tau2-bench/figs/
+Tau2/tau2-bench/tests/
+Tau2/tau2-bench/scripts/
+Tau2/tau2-bench/src/tau2/scripts/leaderboard/
+Tau2/tau2-bench/*.md
+!Tau2/tau2-bench/README.md
