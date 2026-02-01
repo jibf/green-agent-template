@@ -35,3 +35,5 @@ test = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+testpaths = ["tests"]
+norecursedirs = ["agenthard_pipeline", ".venv", "build", "dist"]
