@@ -84,13 +84,10 @@ class Agent:
         debug = request.config.get("debug", False)
         sample_ids = request.config.get("sample_ids", None)
         test_category = request.config.get("test_category", "v3_v4")  # Default to v3_v4 (multi-turn + agentic)
-        data_file = request.config.get("data_file", None)
         invalid_tasks_file = request.config.get("invalid_tasks_file", "BFCL/invalid_tasks.txt")
 
         try:
-            if data_file:
-                test_data = self._load_test_data(data_file)
-            elif sample_ids:
+            if sample_ids:
                 # sample_ids takes precedence over test_category
                 categories = set()
                 import re

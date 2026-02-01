@@ -4,6 +4,16 @@ Tau2 Evaluator - Green agent that runs tau-bench evaluation on purple agents.
 This agent uses tau2's native Orchestrator for evaluation. The purple agent
 being tested is wrapped in a RemoteA2AAgent that communicates via A2A protocol.
 """
+import os
+from pathlib import Path
+
+# Set TAU2_DATA_DIR before importing tau2 modules
+# This works for both Docker and local environments
+TAU2_MODULE_DIR = Path(__file__).parent
+TAU2_DATA_PATH = TAU2_MODULE_DIR / "tau2-bench" / "data"
+if TAU2_DATA_PATH.exists() and "TAU2_DATA_DIR" not in os.environ:
+    os.environ["TAU2_DATA_DIR"] = str(TAU2_DATA_PATH)
+
 import argparse
 import asyncio
 import json
@@ -325,6 +335,29 @@ class Tau2Evaluator(GreenAgent):
         if missing_config_keys:
             return False, f"Missing config keys: {missing_config_keys}"
         return True, "ok"
+
+    async def run(self, message, updater: TaskUpdater) -> None:
+        """
+        Adapter method for RouterExecutor compatibility.
+        Parses Message into EvalRequest and calls run_eval().
+        """
+        from a2a.utils import get_message_text
+        from a2a.utils import new_agent_text_message
+        from pydantic import ValidationError
+
+        input_text = get_message_text(message)
+
+        try:
+            request: EvalRequest = EvalRequest.model_validate_json(input_text)
+            ok, msg = self.validate_request(request)
+            if not ok:
+                await updater.reject(new_agent_text_message(msg))
+                return
+        except ValidationError as e:
+            await updater.reject(new_agent_text_message(f"Invalid request: {e}"))
+            return
+
+        await self.run_eval(request, updater)
 
     async def run_eval(self, req: EvalRequest, updater: TaskUpdater) -> None:
         logger.info(f"Starting tau2 evaluation: {req}")

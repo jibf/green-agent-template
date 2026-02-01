@@ -57,7 +57,7 @@ def validate_tau2_result(result_data: dict) -> bool:
 async def test_tau2_e2e(
     green_agent_url: str = "http://localhost:9009",
     purple_agent_url: str = "http://localhost:8000",
-    domain: str = "airline",
+    domain: str = "all",
     num_tasks: int = 2,
 ):
     """Test Tau2 integration end-to-end."""
@@ -75,6 +75,7 @@ async def test_tau2_e2e(
             "agent": purple_agent_url
         },
         "config": {
+            "benchmark": "tau2",
             "domain": domain,
             "num_tasks": num_tasks,
         }
@@ -216,7 +217,7 @@ async def main():
     parser.add_argument("--green-agent", default="http://localhost:8001", help="Green Agent URL")
     parser.add_argument("--purple-agent", default="http://localhost:8000", help="Purple Agent URL")
     parser.add_argument("--domain", default="airline",
-                       choices=["airline", "retail"],
+                       choices=["airline", "retail", "telecom", "all"],
                        help="Tau2 domain")
     parser.add_argument("--num-tasks", type=int, default=2, help="Number of tasks to run")
 
